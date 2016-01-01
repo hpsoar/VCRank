@@ -3,6 +3,8 @@ __author__ = 'BorYee'
 
 import MySQLdb
 import numpy
+import time
+
 
 
 # ########## GLOBAL PARAM ####### #
@@ -39,10 +41,11 @@ def rank(feature_table_name, score_table_name):
     sql = 'insert into ' + score_table_name + ' (invest_firm_name,score)values(%s,%s)'
     for record in rank_value:
         cursor.execute(sql, [record[0], record[1]])
+        print '[INFO]', time.ctime(), sql % (record[0], record[1])
     cursor.close()
 
 
-def feature_selection(table_name):
+def feature_selection(table_name, begin='2015.01', end='2015.12'):
     """
     This function is using for extracting the features for ranking the invest firm.
         Features:
@@ -60,36 +63,36 @@ def feature_selection(table_name):
             each_age_event_number
             each_next_round_event_number
     """
-    feature_year = '2015'
+
     features = {}
     cursor = CONN.cursor()
     sql = 'select invest_firm_name from tb_invest_firm_base_info'
     invest_firm_list = cursor.fetchmany(cursor.execute(sql))
-    for record in _fill(invest_firm_list, feature_area_number(feature_year)):
+    for record in _fill(invest_firm_list, feature_area_number(begin, end)):
         features[record[0]] = record[1]
     for record in _fill(invest_firm_list, feature_stage_number()):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, feature_round_number(feature_year)):
+    for record in _fill(invest_firm_list, feature_round_number(begin, end)):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_area_event_number(feature_year)):
+    for record in _fill(invest_firm_list, features_each_area_event_number(begin, end)):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_round_event_number(feature_year)):
+    for record in _fill(invest_firm_list, features_each_round_event_number(begin, end)):
         features[record[0]].extend(record[1])
     for record in _fill(invest_firm_list, features_each_year_event_number()):
         features[record[0]].extend(record[1])
     for record in _fill(invest_firm_list, feature_years_len()):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_area_event_amount(feature_year)):
+    for record in _fill(invest_firm_list, features_each_area_event_amount(begin, end)):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_round_event_amount(feature_year)):
+    for record in _fill(invest_firm_list, features_each_round_event_amount(begin, end)):
         features[record[0]].extend(record[1])
     for record in _fill(invest_firm_list, features_each_year_event_amount()):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, feature_listing_number(feature_year)):
+    for record in _fill(invest_firm_list, feature_listing_number(begin, end)):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_age_event_number(feature_year)):
+    for record in _fill(invest_firm_list, features_each_age_event_number(begin, end)):
         features[record[0]].extend(record[1])
-    for record in _fill(invest_firm_list, features_each_next_round_event_number(feature_year)):
+    for record in _fill(invest_firm_list, features_each_next_round_event_number(begin, end)):
         features[record[0]].extend(record[1])
     sql = 'delete from ' + table_name
     cursor.execute(sql)
@@ -98,6 +101,7 @@ def feature_selection(table_name):
         tmp = [record]
         tmp.extend(features[record])
         cursor.execute(sql, tmp)
+        print '[INFO]', time.ctime(), sql % tuple(tmp)
     cursor.close()
 
 
@@ -133,10 +137,10 @@ def _fill(invest_firm_list, feature):
     return res
 
 
-def feature_area_number(feature_year):
+def feature_area_number(begin, end):
     cursor = CONN.cursor()
-    sql = 'SELECT invest_firm_name,COUNT(distinct(area)) FROM db_investment.tb_investment_event where invest_time like %s group by invest_firm_name'
-    round_number = cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%']))
+    sql = 'SELECT invest_firm_name,COUNT(distinct(area)) FROM db_investment.tb_investment_event where invest_time > %s and invest_time < %s group by invest_firm_name'
+    round_number = cursor.fetchmany(cursor.execute(sql, [begin, end]))
     FEATURE_NAME.append('领域数量')
     cursor.close()
     return round_number
@@ -151,16 +155,16 @@ def feature_stage_number():
     return stage_number
 
 
-def feature_round_number(feature_year):
+def feature_round_number(begin, end):
     cursor = CONN.cursor()
-    sql = 'SELECT invest_firm_name,COUNT(distinct(round)) FROM db_investment.tb_investment_event where invest_time like %s group by invest_firm_name'
-    round_number = cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%']))
+    sql = 'SELECT invest_firm_name,COUNT(distinct(round)) FROM db_investment.tb_investment_event where invest_time > %s and invest_time < %s group by invest_firm_name'
+    round_number = cursor.fetchmany(cursor.execute(sql, [begin, end]))
     FEATURE_NAME.append('轮次数量')
     cursor.close()
     return round_number
 
 
-def features_each_area_event_number(feature_year):
+def features_each_area_event_number(begin, end):
     cursor = CONN.cursor()
     each_area_event_number = []
     area_index = {}
@@ -170,8 +174,8 @@ def features_each_area_event_number(feature_year):
     for index in range(area_list.__len__()):
         FEATURE_NAME.append(area_list[index][0] + '数量')
         area_index[area_list[index][0]] = index
-    sql = 'SELECT invest_firm_name, area, COUNT(1) FROM db_investment.tb_investment_event where invest_time like %s GROUP BY invest_firm_name,area'
-    for record in cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%'])):
+    sql = 'SELECT invest_firm_name, area, COUNT(1) FROM db_investment.tb_investment_event where invest_time > %s and invest_time < %s GROUP BY invest_firm_name,area'
+    for record in cursor.fetchmany(cursor.execute(sql, [begin, end])):
         if record[0] not in event_dict:
             event_dict[record[0]] = [(record[1], record[2])]
         else:
@@ -185,7 +189,7 @@ def features_each_area_event_number(feature_year):
     return each_area_event_number
 
 
-def features_each_round_event_number(feature_year):
+def features_each_round_event_number(begin, end):
     cursor = CONN.cursor()
     each_round_event_number = []
     round_index = {}
@@ -195,8 +199,8 @@ def features_each_round_event_number(feature_year):
     for index in range(round_list.__len__()):
         FEATURE_NAME.append(round_list[index][0] + '数量')
         round_index[round_list[index][0]] = index
-    sql = 'SELECT invest_firm_name,round,count(1) FROM db_investment.tb_investment_event where invest_time like %s group by invest_firm_name,round'
-    for record in cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%'])):
+    sql = 'SELECT invest_firm_name,round,count(1) FROM db_investment.tb_investment_event where invest_time > %s and invest_time < %s group by invest_firm_name,round'
+    for record in cursor.fetchmany(cursor.execute(sql, [begin, end])):
         if record[0] not in event_dict:
             event_dict[record[0]] = [(record[1], record[2])]
         else:
@@ -250,7 +254,7 @@ def feature_years_len():
     return res
 
 
-def features_each_area_event_amount(feature_year):
+def features_each_area_event_amount(begin, end):
     cursor = CONN.cursor()
     each_area_event_amount = []
     area_index = {}
@@ -260,8 +264,8 @@ def features_each_area_event_amount(feature_year):
     for index in range(area_list.__len__()):
         FEATURE_NAME.append(area_list[index][0] + '金额')
         area_index[area_list[index][0]] = index
-    sql = 'SELECT invest_firm_name,area,sum(amount) FROM db_investment.tb_amount_tran where invest_time like %s group by invest_firm_name,area'
-    for record in cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%'])):
+    sql = 'SELECT invest_firm_name,area,sum(amount) FROM db_investment.tb_amount_tran where invest_time > %s and invest_time < %s group by invest_firm_name,area'
+    for record in cursor.fetchmany(cursor.execute(sql, [begin, end])):
         if record[0] not in event_dict:
             event_dict[record[0]] = [(record[1], record[2])]
         else:
@@ -275,7 +279,7 @@ def features_each_area_event_amount(feature_year):
     return each_area_event_amount
 
 
-def features_each_round_event_amount(feature_year):
+def features_each_round_event_amount(begin, end):
     cursor = CONN.cursor()
     each_round_event_amount = []
     round_index = {}
@@ -285,8 +289,8 @@ def features_each_round_event_amount(feature_year):
     for index in range(round_list.__len__()):
         FEATURE_NAME.append(round_list[index][0] + '金额')
         round_index[round_list[index][0]] = index
-    sql = 'SELECT invest_firm_name,round,sum(amount) FROM db_investment.tb_amount_tran where invest_time like %s group by invest_firm_name,round'
-    for record in cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%'])):
+    sql = 'SELECT invest_firm_name,round,sum(amount) FROM db_investment.tb_amount_tran where invest_time > %s and invest_time < %s group by invest_firm_name,round'
+    for record in cursor.fetchmany(cursor.execute(sql, [begin, end])):
         if record[0] not in event_dict:
             event_dict[record[0]] = [(record[1], record[2])]
         else:
@@ -381,19 +385,19 @@ def tran_amount():
     cursor.close()
 
 
-def feature_listing_number(feature_year):
+def feature_listing_number(begin, end):
     cursor = CONN.cursor()
-    sql = 'SELECT tb_investment_event.invest_firm_name,count(1) FROM db_investment.tb_project_info,tb_investment_event where tb_investment_event.project_name=tb_project_info.project_name and project_stage = \'上市公司\' group by tb_investment_event.invest_firm_name and invest_time like %s'
-    listing_number = cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%']))
+    sql = 'SELECT tb_investment_event.invest_firm_name,count(1) FROM db_investment.tb_project_info,tb_investment_event where tb_investment_event.project_name=tb_project_info.project_name and project_stage = \'上市公司\' group by tb_investment_event.invest_firm_name and invest_time > %s and invest_time < %s'
+    listing_number = cursor.fetchmany(cursor.execute(sql, [begin, end]))
     cursor.close()
     FEATURE_NAME.append('上市数量')
     return listing_number
 
 
-def features_each_age_event_number(feature_year):
+def features_each_age_event_number(begin, end):
     cursor = CONN.cursor()
-    sql = 'select tb_investment_event.invest_firm_name,tb_project_info.project_name,tb_project_info.registration_time from tb_investment_event,tb_project_info where tb_investment_event.project_name = tb_project_info.project_name and project_status <> \'已关闭\' and tb_investment_event.invest_time like %s group by tb_investment_event.invest_firm_name,tb_project_info.project_name'
-    registration_list = cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%']))
+    sql = 'select tb_investment_event.invest_firm_name,tb_project_info.project_name,tb_project_info.registration_time from tb_investment_event,tb_project_info where tb_investment_event.project_name = tb_project_info.project_name and project_status <> \'已关闭\' and tb_investment_event.invest_time > %s and tb_investment_event.invest_time < %s group by tb_investment_event.invest_firm_name,tb_project_info.project_name'
+    registration_list = cursor.fetchmany(cursor.execute(sql, [begin, end]))
     each_age_event_number = []
     event_dict = {}
     for record in registration_list:
@@ -420,13 +424,13 @@ def features_each_age_event_number(feature_year):
     return each_age_event_number
 
 
-def features_each_next_round_event_number(feature_year):
+def features_each_next_round_event_number(begin, end):
     cursor = CONN.cursor()
-    sql = 'SELECT invest_firm_name,project_name,invest_time FROM db_investment.tb_investment_event where invest_time like %s order by invest_time asc'
+    sql = 'SELECT invest_firm_name,project_name,invest_time FROM db_investment.tb_investment_event where invest_time > %s and invest_time < %s order by invest_time asc'
     event_dict = {}
     event_invest_dict = {}
     each_next_round_event_number = []
-    res = cursor.fetchmany(cursor.execute(sql, ['%'+feature_year+'%']))
+    res = cursor.fetchmany(cursor.execute(sql, [begin, end]))
     for record in res:
         if record[0] not in event_dict:
             event_dict[record[0]] = [(record[1], record[2])]
@@ -455,13 +459,33 @@ def features_each_next_round_event_number(feature_year):
     return each_next_round_event_number
 
 
-if __name__ == '__main__':
-    try:
-        feature_table_name = 'tb_invest_firm_features_2015'
-        score_table_name = 'tb_invest_firm_score_2015'
-        tran_amount()
-        feature_selection(feature_table_name)
-        rank(feature_table_name,score_table_name)
-    finally:
-        CONN.commit()
-        CONN.close()
+def feature_table_judge(table_name, db_name):
+    cursor = CONN.cursor()
+    sql = 'SELECT count(*) FROM information_schema.TABLES WHERE table_name = %s AND TABLE_SCHEMA = %s'
+    res = cursor.fetchmany(cursor.execute(sql, [table_name, 'db_investment']))
+    if res[0][0] == 0:
+        sql = 'CREATE TABLE ' + table_name + ' (  `机构名称` text COLLATE utf8_unicode_ci,  `领域数量` text COLLATE utf8_unicode_ci,  `阶段数量` text COLLATE utf8_unicode_ci,  `轮次数量` text COLLATE utf8_unicode_ci,  `金融数量` text COLLATE utf8_unicode_ci,  `旅游数量` text COLLATE utf8_unicode_ci,  `硬件数量` text COLLATE utf8_unicode_ci,  `汽车交通数量` text COLLATE utf8_unicode_ci,  `企业服务数量` text COLLATE utf8_unicode_ci,  `本地生活数量` text COLLATE utf8_unicode_ci,  `电子商务数量` text COLLATE utf8_unicode_ci,  `教育数量` text COLLATE utf8_unicode_ci,  `广告营销数量` text COLLATE utf8_unicode_ci,  `游戏数量` text COLLATE utf8_unicode_ci,  `文化娱乐体育数量` text COLLATE utf8_unicode_ci,  `医疗健康数量` text COLLATE utf8_unicode_ci,  `房产服务数量` text COLLATE utf8_unicode_ci,  `SNS社交网络数量` text COLLATE utf8_unicode_ci,  `移动互联网数量` text COLLATE utf8_unicode_ci,  `工具软件数量` text COLLATE utf8_unicode_ci,  `未知领域数量` text COLLATE utf8_unicode_ci,  `A轮数量` text COLLATE utf8_unicode_ci,  `收购数量` text COLLATE utf8_unicode_ci,  `种子天使数量` text COLLATE utf8_unicode_ci,  `Pre_A轮数量` text COLLATE utf8_unicode_ci,  `B轮数量` text COLLATE utf8_unicode_ci,  `C轮数量` text COLLATE utf8_unicode_ci,  `战略投资数量` text COLLATE utf8_unicode_ci,  `D轮数量` text COLLATE utf8_unicode_ci,  `F轮_PreIPO数量` text COLLATE utf8_unicode_ci,  `E轮数量` text COLLATE utf8_unicode_ci,  `不明确数量` text COLLATE utf8_unicode_ci,  `IPO上市及以后数量` text COLLATE utf8_unicode_ci,  `1999数量` text COLLATE utf8_unicode_ci,  `2002数量` text COLLATE utf8_unicode_ci,  `2003数量` text COLLATE utf8_unicode_ci,  `2000数量` text COLLATE utf8_unicode_ci,  `2006数量` text COLLATE utf8_unicode_ci,  `2007数量` text COLLATE utf8_unicode_ci,  `2004数量` text COLLATE utf8_unicode_ci,  `2005数量` text COLLATE utf8_unicode_ci,  `2015数量` text COLLATE utf8_unicode_ci,  `2014数量` text COLLATE utf8_unicode_ci,  `2008数量` text COLLATE utf8_unicode_ci,  `2009数量` text COLLATE utf8_unicode_ci,  `2011数量` text COLLATE utf8_unicode_ci,  `2010数量` text COLLATE utf8_unicode_ci,  `2013数量` text COLLATE utf8_unicode_ci,  `2012数量` text COLLATE utf8_unicode_ci,  `机构年龄` text COLLATE utf8_unicode_ci,  `金融金额` text COLLATE utf8_unicode_ci,  `旅游金额` text COLLATE utf8_unicode_ci,  `硬件金额` text COLLATE utf8_unicode_ci,  `汽车交通金额` text COLLATE utf8_unicode_ci,  `企业服务金额` text COLLATE utf8_unicode_ci,  `本地生活金额` text COLLATE utf8_unicode_ci,  `电子商务金额` text COLLATE utf8_unicode_ci,  `教育金额` text COLLATE utf8_unicode_ci,  `广告营销金额` text COLLATE utf8_unicode_ci,  `游戏金额` text COLLATE utf8_unicode_ci,  `文化娱乐体育金额` text COLLATE utf8_unicode_ci,  `医疗健康金额` text COLLATE utf8_unicode_ci,  `房产服务金额` text COLLATE utf8_unicode_ci,  `SNS社交网络金额` text COLLATE utf8_unicode_ci,  `移动互联网金额` text COLLATE utf8_unicode_ci,  `工具软件金额` text COLLATE utf8_unicode_ci,  `未知领域金额` text COLLATE utf8_unicode_ci,  `A轮金额` text COLLATE utf8_unicode_ci,  `收购金额` text COLLATE utf8_unicode_ci,  `种子天使金额` text COLLATE utf8_unicode_ci,  `Pre_A轮金额` text COLLATE utf8_unicode_ci,  `B轮金额` text COLLATE utf8_unicode_ci,  `C轮金额` text COLLATE utf8_unicode_ci,  `战略投资金额` text COLLATE utf8_unicode_ci,  `D轮金额` text COLLATE utf8_unicode_ci,  `F轮_PreIPO金额` text COLLATE utf8_unicode_ci,  `E轮金额` text COLLATE utf8_unicode_ci,  `不明确金额` text COLLATE utf8_unicode_ci,  `IPO上市及以后金额` text COLLATE utf8_unicode_ci,  `1999金额` text COLLATE utf8_unicode_ci,  `2002金额` text COLLATE utf8_unicode_ci,  `2003金额` text COLLATE utf8_unicode_ci,  `2000金额` text COLLATE utf8_unicode_ci,  `2006金额` text COLLATE utf8_unicode_ci,  `2007金额` text COLLATE utf8_unicode_ci,  `2004金额` text COLLATE utf8_unicode_ci,  `2005金额` text COLLATE utf8_unicode_ci,  `2015金额` text COLLATE utf8_unicode_ci,  `2014金额` text COLLATE utf8_unicode_ci,  `2008金额` text COLLATE utf8_unicode_ci,  `2009金额` text COLLATE utf8_unicode_ci,  `2011金额` text COLLATE utf8_unicode_ci,  `2010金额` text COLLATE utf8_unicode_ci,  `2013金额` text COLLATE utf8_unicode_ci,  `2012金额` text COLLATE utf8_unicode_ci,  `上市数量` text COLLATE utf8_unicode_ci,  `所投企业年龄0` text COLLATE utf8_unicode_ci,  `所投企业年龄1` text COLLATE utf8_unicode_ci,  `所投企业年龄2` text COLLATE utf8_unicode_ci,  `所投企业年龄3` text COLLATE utf8_unicode_ci,  `所投企业年龄4` text COLLATE utf8_unicode_ci,  `所投企业年龄5` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数0` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数1` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数2` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数3` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数4` text COLLATE utf8_unicode_ci,  `所投企业后续获得投资轮数5` text COLLATE utf8_unicode_ci) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci'
+        cursor.execute(sql)
+    cursor.close()
+
+
+def score_table_judge(table_name, db_name):
+    cursor = CONN.cursor()
+    sql = 'SELECT count(*) FROM information_schema.TABLES WHERE table_name = %s AND TABLE_SCHEMA = %s'
+    res = cursor.fetchmany(cursor.execute(sql, [table_name, 'db_investment']))
+    if res[0][0] == 0:
+        sql = 'CREATE TABLE ' + table_name + ' (  `id` int(11) NOT NULL AUTO_INCREMENT,  `invest_firm_name` text COLLATE utf8_unicode_ci,  `score` double DEFAULT NULL,  PRIMARY KEY (`id`)) ENGINE=InnoDB AUTO_INCREMENT=4111 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci'
+        cursor.execute(sql)
+    cursor.close()
+
+
+def build_rank(feature_table_name='tb_invest_firm_features_201501_201512',
+               score_table_name='tb_invest_firm_score_201501_201512', begin='2015.01', end='2015.12'):
+    feature_table_judge(feature_table_name, 'db_investment')
+    score_table_judge(score_table_name, 'db_investment')
+    tran_amount()
+    feature_selection(feature_table_name, begin, end)
+    rank(feature_table_name, score_table_name)
+    CONN.commit()
+    CONN.close()
+

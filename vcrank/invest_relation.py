@@ -97,6 +97,8 @@ def load_detection_res():
 def build_relation():
     investment = {}
     cursor = CONN.cursor()
+    sql = 'delete from tb_detail_relation'
+    cursor.execute(sql)
     sql = 'SELECT * FROM db_investment.tb_investment_event where round not like "%不明确%" order by project_name desc'
     res = cursor.fetchmany(cursor.execute(sql))
     for record in res:
@@ -149,6 +151,8 @@ def build_relation():
                         cursor.execute(sql, [src_firm, trg_firm, 'of', trg_round])
                         print '[INFO]', time.ctime(), 'Executed ', sql % (src_firm, trg_firm, 'of', trg_round)
     cursor.close()
+    CONN.commit()
+    CONN.close()
 
 
 if __name__ == '__main__':

@@ -9,9 +9,11 @@ import time
 import random
 import datetime
 from cookielib import MozillaCookieJar
+from invest_relation import build_relation
+from invest_firm_rank import build_rank
 
 ########## GLOBAL PARAMS #######
-UPDATE_GAP = 1
+UPDATE_GAP = 10
 CURRENT_DATE = time.strftime('%Y%m%d', time.localtime(time.time()))
 HOST = 'localhost'
 USER = 'root'
@@ -68,7 +70,7 @@ def _fetch(url):
     :return src: string
         The html source.
     """
-    src = opener.open(url).read()
+    src = opener.open(url, timeout=10).read()
     src = str(src).replace('\n', '')
     return src
 
@@ -96,17 +98,22 @@ def get_invest_firm_link():
     This function is using for fetching and extracting the invest firm link from itjuzi.com.
     """
     base_url = 'http://itjuzi.com/investfirm?page='
-    src_list = []
     initial_url = 'http://itjuzi.com/investfirm'
-    src_list.append(_fetch(initial_url))
+    initial_page = _fetch(initial_url)
     regex = 'http://itjuzi.com/investfirm[?]page=(.*?)"'
-    res_list = re.findall(regex, src_list[0])
+    res_list = re.findall(regex, initial_page)
     page_number = max(map(int, res_list))
+    src_list = ['' for i in range(page_number)]
+    src_list[0] = initial_page
     for i in range(2, page_number + 1):
-        url = base_url + str(i)
-        src_list.append(_fetch(url))
-        print '[INFO]', time.ctime(), 'Finish crawling', url, 'with size', len(src_list[i - 1])
-        _wait()
+        try:
+            url = base_url + str(i)
+            src_list[i - 1] = _fetch(url)
+            print '[INFO]', time.ctime(), 'Finish crawling', url, 'with size', len(src_list[i - 1])
+        except:
+            i -= 1
+            _wait()
+            continue
     name_regex = '名称:(.*?)</a>'
     link_regex = '名称:  <a href="(.*?)">'
     link_list = []
@@ -139,7 +146,6 @@ def get_invest_firm_info(name, url):
         The url of the invest firm.
     """
     src = _fetch(url)
-    _wait()
     base_info = []
     stage = []
     area = []
@@ -292,9 +298,7 @@ def get_project_info(url):
     :param url: String
         The link of the project.
     """
-
     src = _fetch(url)
-    _wait()
     base_info = []
     tags = []
     manager = []
@@ -426,18 +430,33 @@ def event_control():
     sql = 'select * from tb_event_link'
     res = cursor.execute(sql)
     res = cursor.fetchmany(res)
-    for record in res:
-        print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
-        if record[3] == None:
-            get_project_info(record[2])
-        else:
-            curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
-            curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
-            last_update_time = time.strptime(record[3], '%Y%m%d')
-            last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
-            delta_time = (curr_time - last_update_time).days
-            if delta_time >= UPDATE_GAP:
+    counter = 0
+    for index in range(res.__len__()):
+        record = res[index]
+        try:
+            if record[3] == None:
+                print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
                 get_project_info(record[2])
+            else:
+                curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
+                curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
+                last_update_time = time.strptime(record[3], '%Y%m%d')
+                last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
+                delta_time = (curr_time - last_update_time).days
+                if delta_time >= UPDATE_GAP:
+                    print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
+                    get_project_info(record[2])
+        except:
+            counter += 1
+            # _wait()
+            if counter < 3:
+                index -= 1
+                continue
+            else:
+                counter = 0
+                continue
+        finally:
+            CONN.commit()
     cursor.close()
 
 
@@ -510,22 +529,39 @@ def investor_control():
     """
     This function is using for controling the processing of dealing with the investor info fetching.
     """
+    print 'test' * 100
     cursor = CONN.cursor()
     sql = 'select * from tb_investor_link'
     res = cursor.execute(sql)
     res = cursor.fetchmany(res)
-    for record in res:
-        print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
-        if record[3] == None:
-            get_investor_info(record[2])
-        else:
-            curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
-            curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
-            last_update_time = time.strptime(record[3], '%Y%m%d')
-            last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
-            delta_time = (curr_time - last_update_time).days
-            if delta_time >= UPDATE_GAP:
+    counter = 0
+    for index in range(res.__len__()):
+        record = res[index]
+        try:
+            if record[3] == None:
+                print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
                 get_investor_info(record[2])
+            else:
+                curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
+                curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
+                last_update_time = time.strptime(record[3], '%Y%m%d')
+                last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
+                delta_time = (curr_time - last_update_time).days
+                if delta_time >= UPDATE_GAP:
+                    print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
+                    get_investor_info(record[2])
+        except Exception, e:
+            print e
+            counter += 1
+            # _wait()
+            if counter < 3:
+                index -= 1
+                continue
+            else:
+                counter = 0
+                continue
+        finally:
+            CONN.commit()
     cursor.close()
 
 
@@ -602,31 +638,167 @@ def manager_control():
     sql = 'select * from tb_project_manager_link'
     res = cursor.execute(sql)
     res = cursor.fetchmany(res)
-    for record in res:
-        print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
-        if record[3] == None:
-            get_manager_info(record[2])
-        else:
-            curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
-            curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
-            last_update_time = time.strptime(record[3], '%Y%m%d')
-            last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
-            delta_time = (curr_time - last_update_time).days
-            if delta_time >= UPDATE_GAP:
+    counter = 0
+    for index in range(res.__len__()):
+        record = res[index]
+        try:
+            print '[INFO]', time.ctime(), 'Dealing', record[1], record[2], record[3]
+            if record[3] == None:
                 get_manager_info(record[2])
+            else:
+                curr_time = time.strptime(CURRENT_DATE, '%Y%m%d')
+                curr_time = datetime.datetime(curr_time[0], curr_time[1], curr_time[2])
+                last_update_time = time.strptime(record[3], '%Y%m%d')
+                last_update_time = datetime.datetime(last_update_time[0], last_update_time[1], last_update_time[2])
+                delta_time = (curr_time - last_update_time).days
+                if delta_time >= UPDATE_GAP:
+                    get_manager_info(record[2])
+        except Exception, e:
+            print e
+            counter += 1
+            # _wait()
+            if counter < 3:
+                index -= 1
+                continue
+            else:
+                counter = 0
+                continue
+        finally:
+            CONN.commit()
     cursor.close()
 
 
+def _delete_record():
+    cursor = CONN.cursor()
+    sql = 'delete from tb_investment_event'
+    cursor.execute(sql)
+    sql = 'delete from tb_invest_firm_link'
+    cursor.execute(sql)
+    sql = 'delete from tb_invest_firm_base_info'
+    cursor.execute(sql)
+    sql = 'delete from tb_invest_firm_area'
+    cursor.execute(sql)
+    sql = 'delete from tb_invest_firm_investor'
+    cursor.execute(sql)
+    sql = 'delete from tb_invest_firm_stage'
+    cursor.execute(sql)
+    sql = 'delete from tb_investor_area'
+    cursor.execute(sql)
+    sql = 'delete from tb_investor_link'
+    cursor.execute(sql)
+    sql = 'delete from tb_project_info'
+    cursor.execute(sql)
+    sql = 'delete from tb_project_manager'
+    cursor.execute(sql)
+    sql = 'delete from tb_project_manager_link'
+    cursor.execute(sql)
+    sql = 'delete from tb_project_manager_role'
+    cursor.execute(sql)
+    sql = 'delete from tb_project_tag'
+    cursor.execute(sql)
+    sql = 'delete from tb_event_link'
+    cursor.execute(sql)
+    cursor.close()
+
+
+def copy_data(src_table, target_table):
+    cursor = CONN.cursor()
+    select_sql = 'select * from %s'
+    delete_sql = 'delete from %s'
+    cursor.execute(delete_sql, [target_table])
+    for record in cursor.fetchmany(cursor.execute(select_sql, [src_table])):
+        params = ','.join(['%s'] * record.__len__())
+        insert_sql = 'insert into %s VALUES (' + params + ')'
+        tmp = [target_table]
+        tmp.extend(params)
+        cursor.execute(insert_sql, tmp)
+        print '[INFO]', time.ctime(), 'Executed', insert_sql % tmp
+    cursor.close()
+    CONN.commit()
+
+
+def update_control():
+    cursor = CONN.cursor()
+    sql = 'show tables'
+    tables = cursor.fetchmany(cursor.execute(sql))
+    auto_tables = []
+    update_table = []
+    for record in tables:
+        if not record[0].find('auto') == -1:
+            auto_tables.append(record[0])
+            update_table.append(record[0].replace('_auto',''))
+
+    for index in range(auto_tables.__len__()):
+        delete_sql = 'delete from '+auto_tables[index]
+        update_sql = 'insert into '+auto_tables[index]+' select * from '+update_table[index]
+        print update_sql
+        cursor.execute(delete_sql)
+        cursor.execute(update_sql)
+    cursor.close()
+
 if __name__ == '__main__':
     while True:
+        _delete_record()
+        _login()
+        get_invest_firm_link()
+        while True:
+            try:
+                invest_firm_control()
+            except:
+                continue
+            finally:
+                CONN.commit()
+            break
+        while True:
+            try:
+                event_control()
+            except:
+                continue
+            finally:
+                CONN.commit()
+            break
+        while True:
+            try:
+                investor_control()
+            except:
+                continue
+            finally:
+                CONN.commit()
+            break
+        while True:
+            try:
+                manager_control()
+            except:
+                continue
+            finally:
+                CONN.commit()
+            break
+        while True:
+            try:
+                print '[INFO]',time.ctime(),'Executing program update VC Rank.'
+                build_rank()
+            except Exception,e:
+                print e
+                continue
+            finally:
+                CONN.commit()
+            break
+        while True:
+            try:
+                print '[INFO]',time.ctime(),'Executing program update VC Relation.'
+                build_relation()
+            except:
+                continue
+            finally:
+                CONN.commit()
+            break
         try:
-            _login()
-            get_invest_firm_link()
-            invest_firm_control()
-            event_control()
-            investor_control()
-            manager_control()
-            time.sleep(24 * 60 * 60)
+            print '[INFO]',time.ctime(),'Executing program update data to auto tables.'
+            update_control()
+        except:
+            continue
         finally:
             CONN.commit()
-            CONN.close()
+        break
+    CONN.close()
+

@@ -1,0 +1,72 @@
+try:
+	feed.append(cid)
+except:
+	feed.append('')
+try:
+	feed.append(data['canDel'])
+except:
+	feed.append('')
+try:
+	feed.append(data['companyFeed'])
+except:
+	feed.append('')
+try:
+	feed.append(data['content'])
+except:
+	feed.append('')
+try:
+	feed.append(data['feedId'])
+except:
+	feed.append('')
+try:
+	feed.append(data['feedNamespace'])
+except:
+	feed.append('')
+try:
+	feed.append(data['feedTemplateId'])
+except:
+	feed.append('')
+try:
+	feed.append(data['feedTime'])
+except:
+	feed.append('')
+try:
+	feed.append(data['feedTypeId'])
+except:
+	feed.append('')
+try:
+	feed.append(data['innerId'])
+except:
+	feed.append('')
+try:
+	feed.append(data['innerImgLink'])
+except:
+	feed.append('')
+try:
+	feed.append(data['innerImgUrl'])
+except:
+	feed.append('')
+try:
+	feed.append(data['mainId'])
+except:
+	feed.append('')
+try:
+	feed.append(data['mainImgUrl'])
+except:
+	feed.append('')
+try:
+	feed.append(data['mainName'])
+except:
+	feed.append('')
+try:
+	feed.append(data['miniFeedInnerImg'])
+except:
+	feed.append('')
+try:
+	feed.append(data['realTime'])
+except:
+	feed.append('')
+try:
+	feed.append(data['userFeed'])
+except:
+	feed.append('')
